@@ -301,7 +301,7 @@ def recognize_from_file(file_path, container_name="bc-test-samples-segregated", 
 
     except Exception as e:
         print(f"Fatal error in recognize_from_file: {e}")
-        return [], {}
+        raise
 
 
 
