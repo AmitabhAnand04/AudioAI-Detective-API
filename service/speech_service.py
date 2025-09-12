@@ -297,7 +297,7 @@ def recognize_from_file(file_path, container_name="bc-test-samples-segregated", 
             except Exception as e:
                 print(f"Error deleting temp file {wav_path}: {e}")
 
-        return transcriptions, uploaded_files, original_file
+        return (transcriptions, uploaded_files, original_file)
 
     except Exception as e:
         print(f"Fatal error in recognize_from_file: {e}")
