@@ -8,18 +8,16 @@ from fastapi.responses import JSONResponse
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from typing import Dict, List
 from psycopg2.extras import RealDictCursor
-
+from fastapi.middleware.cors import CORSMiddleware
 from service.db_service import connect_to_db
 from service.process_audio_resemble import process_audio
 from service.process_result_resemble import update_audio_data
+from dotenv import load_dotenv, find_dotenv
+load_dotenv(find_dotenv())
 
-app = FastAPI()
-
+USERNAME = os.getenv("Auth_USERNAME", "admin")
+PASSWORD = os.getenv("Auth_PASSWORD", "password")
 security = HTTPBasic()
-
-# Hard-coded credentials (replace with env variables in production)
-USERNAME = "admin"
-PASSWORD = "secret123"
 
 def authenticate(credentials: HTTPBasicCredentials = Depends(security)):
     if not (credentials.username == USERNAME and credentials.password == PASSWORD):
@@ -29,6 +27,24 @@ def authenticate(credentials: HTTPBasicCredentials = Depends(security)):
             headers={"WWW-Authenticate": "Basic"},
         )
     return credentials.username
+
+app = FastAPI(
+    title="AI vs Human Voice Detective API",
+    description="Accepts an audio file and returns details detection report per segment and more.",
+    version="1.0.0"
+)
+
+allowed_origins = os.getenv("ALLOWED_ORIGINS", "*").split(",")
+# Allow cross-origin requests if needed
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[origin.strip() for origin in allowed_origins], 
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+
 
 def background_task(file_path: str):
     try:
@@ -98,7 +114,7 @@ async def resemble_callback(request: Request, background_tasks: BackgroundTasks)
         )
 
 @app.get("/get-results")
-async def get_results(file_name: str = Query(..., description="File name to fetch results for")):
+async def get_results(file_name: str = Query(..., description="File name to fetch results for"), user: str = Depends(authenticate)):
     cur, conn = connect_to_db()
     cur.execute("SELECT * FROM audio_data WHERE file_name = %s", (file_name,))
     rows = cur.fetchall()
@@ -145,7 +161,7 @@ async def get_results(file_name: str = Query(..., description="File name to fetc
     return response
 
 @app.get("/get_files")
-async def get_files():
+async def get_files(user: str = Depends(authenticate)):
     try:
         cur, conn = connect_to_db()
         cur.execute("SELECT DISTINCT(file_name) FROM audio_data")
