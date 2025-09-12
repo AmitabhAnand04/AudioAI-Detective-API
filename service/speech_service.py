@@ -186,6 +186,21 @@ import azure.cognitiveservices.speech as speechsdk
 
 def recognize_from_file(file_path, container_name="bc-test-samples-segregated", folder_name="savedbycode"):
     try:
+        # Initialize Blob Service Client
+        blob_service_client = BlobServiceClient.from_connection_string(
+            os.getenv("AZURE_STORAGE_CONNECTION_STRING")
+        )
+        container_client = blob_service_client.get_container_client(container_name)
+        # container_client.create_container()
+
+        # Upload original file
+        with open(file_path, "rb") as data:
+            original_blob_name = f"{folder_name}/{os.path.basename(file_path)}"
+            blob_client = container_client.get_blob_client(original_blob_name)
+            blob_client.upload_blob(data, overwrite=True)
+            original_file = blob_client.url
+            print(f"Uploaded original file: {original_file}")
+
         # Configure Azure Speech
         speech_config = speechsdk.SpeechConfig(
             subscription=os.getenv("SPEECH_KEY"),
@@ -218,12 +233,6 @@ def recognize_from_file(file_path, container_name="bc-test-samples-segregated", 
         except Exception as e:
             raise RuntimeError(f"Failed to load audio file: {file_path}, error: {e}")
 
-        # Azure Blob setup
-        blob_service_client = BlobServiceClient.from_connection_string(
-            os.getenv("AZURE_STORAGE_CONNECTION_STRING")
-        )
-        container_client = blob_service_client.get_container_client(container_name)
-        # container_client.create_container()
 
         speaker_clips = defaultdict(list)
         transcriptions = []
@@ -288,7 +297,7 @@ def recognize_from_file(file_path, container_name="bc-test-samples-segregated", 
             except Exception as e:
                 print(f"Error deleting temp file {wav_path}: {e}")
 
-        return transcriptions, uploaded_files
+        return transcriptions, uploaded_files, original_file
 
     except Exception as e:
         print(f"Fatal error in recognize_from_file: {e}")

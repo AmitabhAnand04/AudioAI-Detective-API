@@ -1,3 +1,5 @@
+import os
+import uuid
 import psycopg2
 import json
 
@@ -6,8 +8,10 @@ from service.resemble_detection_service import analyze_audio
 from service.speech_service import recognize_from_file
 
 def process_audio(file_path):
+    file_name = os.path.basename(file_path)   # original filename
+    file_id = str(uuid.uuid4())
     # Step 1: Get transcriptions and uploaded files
-    transcriptions, uploaded_files = recognize_from_file(file_path)
+    transcriptions, uploaded_files, original_file = recognize_from_file(file_path)
 
     results = []
 
@@ -27,15 +31,18 @@ def process_audio(file_path):
         # cur = conn.cursor()
 
         insert_query = """
-            INSERT INTO audio_data (speaker_name, file_url, file_uuid, transcriptions)
-            VALUES (%s, %s, %s, %s)
+            INSERT INTO audio_data (speaker_name, file_url, file_uuid, transcriptions, file_name, file_id, original_file_url)
+            VALUES (%s, %s, %s, %s, %s, %s, %s)
             RETURNING id;
         """
         cur.execute(insert_query, (
             speaker,
             url,
             file_uuid,
-            json.dumps(speaker_transcripts)  # Store transcripts as JSON
+            json.dumps(speaker_transcripts),
+            file_name,
+            file_id,
+            original_file
         ))
 
         inserted_id = cur.fetchone()[0]
@@ -48,6 +55,9 @@ def process_audio(file_path):
             "speaker": speaker,
             "url": url,
             "uuid": file_uuid,
+            "file_name": file_name,
+            "file_id": file_id,
+            "file_url": original_file,
             "transcriptions": speaker_transcripts
         })
 

@@ -1,11 +1,15 @@
+import json
 import os
 import shutil
 import tempfile
 from fastapi import BackgroundTasks, FastAPI, Request, UploadFile, File, Depends, HTTPException, status
+from fastapi.params import Query
+from fastapi.responses import JSONResponse
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from typing import Dict, List
+from psycopg2.extras import RealDictCursor
 
-
+from service.db_service import connect_to_db
 from service.process_audio_resemble import process_audio
 from service.process_result_resemble import update_audio_data
 
@@ -45,11 +49,18 @@ async def analyze_audio(
 ):
     file_paths = []
 
+    # for file in files:
+    #     suffix = os.path.splitext(file.filename)[-1]
+    #     with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as temp_file:
+    #         shutil.copyfileobj(file.file, temp_file)
+    #         file_paths.append(temp_file.name)
     for file in files:
-        suffix = os.path.splitext(file.filename)[-1]
-        with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as temp_file:
+        safe_filename = file.filename.replace(" ", "_")   # replace spaces
+        temp_path = os.path.join(tempfile.gettempdir(), safe_filename)
+        with open(temp_path, "wb") as temp_file:
             shutil.copyfileobj(file.file, temp_file)
-            file_paths.append(temp_file.name)
+        file_paths.append(temp_path)
+
 
     # Schedule each file for background processing
     for path in file_paths:
@@ -86,6 +97,115 @@ async def resemble_callback(request: Request, background_tasks: BackgroundTasks)
             detail=f"Failed to process callback: {e}"
         )
 
+@app.get("/get-results")
+async def get_results(file_name: str = Query(..., description="File name to fetch results for")):
+    cur, conn = connect_to_db()
+    cur.execute("SELECT * FROM audio_data WHERE file_name = %s", (file_name,))
+    rows = cur.fetchall()
+
+    colnames = [desc[0] for desc in cur.description]  # get column names
+    cur.close()
+    conn.close()
+
+    if not rows:
+        return JSONResponse({"error": "No records found"}, status_code=404)
+
+    # Extract original_file_url from first row
+    first_row_dict = dict(zip(colnames, rows[0]))
+    original_file_url = first_row_dict.get("original_file_url")
+
+    response = {
+        "file_name": file_name,
+        "file_url": original_file_url,  # add at top-level
+        "segments": []
+    }
+
+    for row in rows:
+        row_dict = dict(zip(colnames, row))  # map tuple → dict
+
+        transcriptions = row_dict["transcriptions"]
+        label = row_dict["analysis_label"]
+        scores = row_dict["analysis_scores"]
+        consistency = row_dict["consistency"]
+        aggregated_score = row_dict["aggregated_score"]
+
+        for t in transcriptions:
+            response["segments"].append({
+                "end": t["end"],
+                "text": t["text"],
+                "start": t["start"],
+                "metrics": {
+                    "label": label,
+                    "score": scores,
+                    "consistency": consistency,
+                    "aggregated_score": aggregated_score
+                }
+            })
+
+    return response
+
+@app.get("/get_files")
+async def get_files():
+    try:
+        cur, conn = connect_to_db()
+        cur.execute("SELECT DISTINCT(file_name) FROM audio_data")
+        rows = cur.fetchall()
+        cur.close()
+        conn.close()
+
+        if not rows:
+            return JSONResponse({"error": "No files found"}, status_code=404)
+
+        # Extract file names and filter out None
+        file_names = [row[0] for row in rows if row[0] is not None]
+
+        return {"files": file_names}
+
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=500)
+
+@app.get("/")
+async def health_check():
+    """
+    Simple health check route to verify API is running.
+    """
+    return {"status": "ok", "message": "API is deployed and working"}
+
+
+
+# async def get_results(file_name: str = Query(..., description="File name to fetch results for")):
+#     cur, conn = connect_to_db()
+#     cur.execute("SELECT * FROM audio_data WHERE file_name = %s", (file_name,))
+#     rows = cur.fetchall()
+#     cur.close()
+#     conn.close()
+#     if not rows:
+#         return JSONResponse({"error": "No records found"}, status_code=404)
+
+#     response = {"file_name": file_name, "segments": []}
+
+#     for row in rows:
+#         # Adapt to your table order: (id, speaker, url, uuid, transcriptions, ..., label, scores, consistency, aggregated_score, file_name, file_id, file_url)
+#         transcriptions = row[4]
+#         label = row[7]
+#         scores = row[8]
+#         consistency = row[9]
+#         aggregated_score = row[10]
+
+#         for t in transcriptions:
+#             response["segments"].append({
+#                 "end": t["end"],
+#                 "text": t["text"],
+#                 "start": t["start"],
+#                 "metrics": {
+#                     "label": label,
+#                     "score": scores,
+#                     "consistency": consistency,
+#                     "aggregated_score": aggregated_score
+#                 }
+#             })
+
+#     return response
 # @app.post("/resemble-callback")
 # async def resemble_callback(request: Request):
 #     try:

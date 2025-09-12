@@ -19,6 +19,11 @@ def analyze_audio(file_url: str) -> str:
     }
     params = {"url": file_url}
 
+    callback_url = os.getenv("RESEMBLE_CALLBACK_URL")
+    if callback_url:
+        params["callback_url"] = callback_url
+
+
     try:
         response = requests.post(api_url, headers=headers, params=params, data={})
         response.raise_for_status()
