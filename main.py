@@ -238,10 +238,33 @@ async def analyze_audio(file: UploadFile = File(...), user: str = Depends(authen
     with open(temp_path, "wb") as temp_file:
         shutil.copyfileobj(file.file, temp_file)
 
+    # try:
+    #     # Call your function
+    #     results = process_audio(temp_path)
+    #     return results
+    # finally:
+    #     # Cleanup temp file
+    #     if os.path.exists(temp_path):
+    #         os.remove(temp_path)
     try:
         # Call your function
         results = process_audio(temp_path)
         return results
+    except Exception as e:
+        import traceback
+        error_message = str(e)
+        error_trace = traceback.format_exc()
+
+        # Print to logs (so you can see in console/Azure logs)
+        print("Error occurred while processing audio:")
+        print(error_trace)
+
+        # Return structured error response
+        return {
+            "status": "error",
+            "message": error_message,
+            "trace": error_trace
+        }
     finally:
         # Cleanup temp file
         if os.path.exists(temp_path):

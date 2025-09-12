@@ -7,58 +7,140 @@ from service.db_service import connect_to_db
 from service.resemble_detection_service import analyze_audio
 from service.speech_service import recognize_from_file
 
+# def process_audio(file_path):
+#     file_name = os.path.basename(file_path)   # original filename
+#     file_id = str(uuid.uuid4())
+#     # Step 1: Get transcriptions and uploaded files
+#     transcriptions, uploaded_files, original_file = recognize_from_file(file_path)
+
+#     results = []
+
+#     # Step 2: Process each speaker
+#     for speaker, url in uploaded_files.items():
+#         # Call second function to get uuid
+#         file_uuid = analyze_audio(url)
+
+#         # Collect all transcription segments for this speaker
+#         speaker_transcripts = [
+#             {"text": text, "start": start, "end": end}
+#             for spk, text, start, end in transcriptions if spk == speaker
+#         ]
+
+#         # Step 3: Store in PostgreSQL
+#         cur, conn = connect_to_db()
+#         # cur = conn.cursor()
+
+#         insert_query = """
+#             INSERT INTO audio_data (speaker_name, file_url, file_uuid, transcriptions, file_name, file_id, original_file_url)
+#             VALUES (%s, %s, %s, %s, %s, %s, %s)
+#             RETURNING id;
+#         """
+#         cur.execute(insert_query, (
+#             speaker,
+#             url,
+#             file_uuid,
+#             json.dumps(speaker_transcripts),
+#             file_name,
+#             file_id,
+#             original_file
+#         ))
+
+#         inserted_id = cur.fetchone()[0]
+#         conn.commit()
+#         cur.close()
+#         conn.close()
+
+#         results.append({
+#             "id": inserted_id,
+#             "speaker": speaker,
+#             "url": url,
+#             "uuid": file_uuid,
+#             "file_name": file_name,
+#             "file_id": file_id,
+#             "file_url": original_file,
+#             "transcriptions": speaker_transcripts
+#         })
+
+#     return results
+
+# import os
+# import uuid
+# import json
+import traceback
+
 def process_audio(file_path):
+    results = []
     file_name = os.path.basename(file_path)   # original filename
     file_id = str(uuid.uuid4())
-    # Step 1: Get transcriptions and uploaded files
-    transcriptions, uploaded_files, original_file = recognize_from_file(file_path)
 
-    results = []
+    try:
+        # Step 1: Get transcriptions and uploaded files
+        transcriptions, uploaded_files, original_file = recognize_from_file(file_path)
 
-    # Step 2: Process each speaker
-    for speaker, url in uploaded_files.items():
-        # Call second function to get uuid
-        file_uuid = analyze_audio(url)
+        # Step 2: Process each speaker
+        for speaker, url in uploaded_files.items():
+            try:
+                # Call second function to get uuid
+                file_uuid = analyze_audio(url)
 
-        # Collect all transcription segments for this speaker
-        speaker_transcripts = [
-            {"text": text, "start": start, "end": end}
-            for spk, text, start, end in transcriptions if spk == speaker
-        ]
+                # Collect all transcription segments for this speaker
+                speaker_transcripts = [
+                    {"text": text, "start": start, "end": end}
+                    for spk, text, start, end in transcriptions if spk == speaker
+                ]
 
-        # Step 3: Store in PostgreSQL
-        cur, conn = connect_to_db()
-        # cur = conn.cursor()
+                # Step 3: Store in PostgreSQL
+                cur, conn = connect_to_db()
+                try:
+                    insert_query = """
+                        INSERT INTO audio_data (
+                            speaker_name, file_url, file_uuid,
+                            transcriptions, file_name, file_id, original_file_url
+                        )
+                        VALUES (%s, %s, %s, %s, %s, %s, %s)
+                        RETURNING id;
+                    """
+                    cur.execute(insert_query, (
+                        speaker,
+                        url,
+                        file_uuid,
+                        json.dumps(speaker_transcripts),
+                        file_name,
+                        file_id,
+                        original_file
+                    ))
 
-        insert_query = """
-            INSERT INTO audio_data (speaker_name, file_url, file_uuid, transcriptions, file_name, file_id, original_file_url)
-            VALUES (%s, %s, %s, %s, %s, %s, %s)
-            RETURNING id;
-        """
-        cur.execute(insert_query, (
-            speaker,
-            url,
-            file_uuid,
-            json.dumps(speaker_transcripts),
-            file_name,
-            file_id,
-            original_file
-        ))
+                    inserted_id = cur.fetchone()[0]
+                    conn.commit()
 
-        inserted_id = cur.fetchone()[0]
-        conn.commit()
-        cur.close()
-        conn.close()
+                    results.append({
+                        "id": inserted_id,
+                        "speaker": speaker,
+                        "url": url,
+                        "uuid": file_uuid,
+                        "file_name": file_name,
+                        "file_id": file_id,
+                        "file_url": original_file,
+                        "transcriptions": speaker_transcripts
+                    })
 
-        results.append({
-            "id": inserted_id,
-            "speaker": speaker,
-            "url": url,
-            "uuid": file_uuid,
-            "file_name": file_name,
-            "file_id": file_id,
-            "file_url": original_file,
-            "transcriptions": speaker_transcripts
-        })
+                except Exception as db_err:
+                    conn.rollback()
+                    print("Database error:", db_err)
+                    print(traceback.format_exc())
+                    raise
+                finally:
+                    cur.close()
+                    conn.close()
+
+            except Exception as speaker_err:
+                print(f"Error processing speaker {speaker}: {speaker_err}")
+                print(traceback.format_exc())
+                continue  # move on to next speaker
+
+    except Exception as main_err:
+        print("Fatal error in process_audio:", main_err)
+        print(traceback.format_exc())
+        raise  # re-raise so caller sees the actual error
 
     return results
