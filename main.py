@@ -114,9 +114,9 @@ async def resemble_callback(request: Request, background_tasks: BackgroundTasks)
         )
 
 @app.get("/get-results")
-async def get_results(file_name: str = Query(..., description="File name to fetch results for"), user: str = Depends(authenticate)):
+async def get_results(file_name: str = Query(..., description="File name to fetch result for"),file_id:str = Query(..., description="File id to fetch result for"), user: str = Depends(authenticate)):
     cur, conn = connect_to_db()
-    cur.execute("SELECT * FROM audio_data WHERE file_name = %s", (file_name,))
+    cur.execute("SELECT * FROM audio_data WHERE file_name = %s AND file_id = %s", (file_name, file_id))
     rows = cur.fetchall()
 
     colnames = [desc[0] for desc in cur.description]  # get column names
@@ -132,6 +132,7 @@ async def get_results(file_name: str = Query(..., description="File name to fetc
 
     response = {
         "file_name": file_name,
+        "file_id": file_id,
         "file_url": original_file_url,  # add at top-level
         "segments": []
     }
@@ -164,7 +165,13 @@ async def get_results(file_name: str = Query(..., description="File name to fetc
 async def get_files(user: str = Depends(authenticate)):
     try:
         cur, conn = connect_to_db()
-        cur.execute("SELECT DISTINCT(file_name) FROM audio_data")
+        cur.execute("""SELECT DISTINCT ON (file_id)
+                        file_id,
+                        file_name,
+                        created_at
+                    FROM audio_data
+                    WHERE analysis_label IS NOT NULL
+                    AND file_id IS NOT NULL""")
         rows = cur.fetchall()
         cur.close()
         conn.close()
@@ -172,10 +179,17 @@ async def get_files(user: str = Depends(authenticate)):
         if not rows:
             return JSONResponse({"error": "No files found"}, status_code=404)
 
-        # Extract file names and filter out None
-        file_names = [row[0] for row in rows if row[0] is not None]
+        # Map rows to structured response
+        files = [
+            {
+                "file_id": str(row[0]),
+                "file_name": row[1],
+                "created_at": row[2].isoformat() if row[2] else None
+            }
+            for row in rows
+        ]
 
-        return {"files": file_names}
+        return {"files": files}
 
     except Exception as e:
         return JSONResponse({"error": str(e)}, status_code=500)

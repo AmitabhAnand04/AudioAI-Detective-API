@@ -4,7 +4,7 @@ import psycopg2
 import json
 
 from service.db_service import connect_to_db
-from service.resemble_detection_service import analyze_audio
+from service.resemble_detection_service import analyze_audio, analyze_result
 from service.speech_service import recognize_from_file
 
 # def process_audio(file_path):
@@ -83,7 +83,11 @@ def process_audio(file_path):
             try:
                 # Call second function to get uuid
                 file_uuid = analyze_audio(url)
-
+                result = analyze_result(file_uuid)  
+                analysis_label = result.get("analysis_label")
+                analysis_scores = result.get("analysis_scores")
+                consistency = result.get("consistency")
+                aggregated_score = result.get("aggregated_score")
                 # Collect all transcription segments for this speaker
                 speaker_transcripts = [
                     {"text": text, "start": start, "end": end}
@@ -96,11 +100,13 @@ def process_audio(file_path):
                     insert_query = """
                         INSERT INTO audio_data (
                             speaker_name, file_url, file_uuid,
-                            transcriptions, file_name, file_id, original_file_url
+                            transcriptions, file_name, file_id, original_file_url,
+                            analysis_label, analysis_scores, consistency, aggregated_score
                         )
-                        VALUES (%s, %s, %s, %s, %s, %s, %s)
+                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                         RETURNING id;
                     """
+
                     cur.execute(insert_query, (
                         speaker,
                         url,
@@ -108,8 +114,13 @@ def process_audio(file_path):
                         json.dumps(speaker_transcripts),
                         file_name,
                         file_id,
-                        original_file
+                        original_file,
+                        analysis_label,
+                        json.dumps(analysis_scores),
+                        consistency,
+                        aggregated_score
                     ))
+
 
                     inserted_id = cur.fetchone()[0]
                     conn.commit()
