@@ -41,35 +41,35 @@ def background_task(file_path: str):
             print(f"🗑️ Deleted temp file {file_path}")
 
 
-# @app.post("/analyze-audio")
-# async def analyze_audio(
-#     background_tasks: BackgroundTasks,
-#     files: List[UploadFile] = File(...),
-#     user: str = Depends(authenticate),
-# ):
-#     file_paths = []
+@app.post("/analyze-audio")
+async def analyze_audio(
+    background_tasks: BackgroundTasks,
+    files: List[UploadFile] = File(...),
+    user: str = Depends(authenticate),
+):
+    file_paths = []
 
-#     # for file in files:
-#     #     suffix = os.path.splitext(file.filename)[-1]
-#     #     with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as temp_file:
-#     #         shutil.copyfileobj(file.file, temp_file)
-#     #         file_paths.append(temp_file.name)
-#     for file in files:
-#         safe_filename = file.filename.replace(" ", "_")   # replace spaces
-#         temp_path = os.path.join(tempfile.gettempdir(), safe_filename)
-#         with open(temp_path, "wb") as temp_file:
-#             shutil.copyfileobj(file.file, temp_file)
-#         file_paths.append(temp_path)
+    # for file in files:
+    #     suffix = os.path.splitext(file.filename)[-1]
+    #     with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as temp_file:
+    #         shutil.copyfileobj(file.file, temp_file)
+    #         file_paths.append(temp_file.name)
+    for file in files:
+        safe_filename = file.filename.replace(" ", "_")   # replace spaces
+        temp_path = os.path.join(tempfile.gettempdir(), safe_filename)
+        with open(temp_path, "wb") as temp_file:
+            shutil.copyfileobj(file.file, temp_file)
+        file_paths.append(temp_path)
 
 
-#     # Schedule each file for background processing
-#     for path in file_paths:
-#         background_tasks.add_task(background_task, path)
+    # Schedule each file for background processing
+    for path in file_paths:
+        background_tasks.add_task(background_task, path)
 
-#     return {
-#         "message": f"Processing started for {len(file_paths)} file(s).",
-#         "files": [os.path.basename(p) for p in file_paths],
-#     }
+    return {
+        "message": f"Processing started for {len(file_paths)} file(s).",
+        "files": [os.path.basename(p) for p in file_paths],
+    }
 
 @app.post("/resemble-callback")
 async def resemble_callback(request: Request, background_tasks: BackgroundTasks):
@@ -230,45 +230,45 @@ async def health_check():
 #             detail=f"Failed to process callback: {e}"
 #         )
 
-@app.post("/analyze-audio")
-async def analyze_audio(file: UploadFile = File(...), user: str = Depends(authenticate)):
-    # Create a temporary file
-    safe_filename = file.filename.replace(" ", "_")   # replace spaces
-    temp_path = os.path.join(tempfile.gettempdir(), safe_filename)
-    with open(temp_path, "wb") as temp_file:
-        shutil.copyfileobj(file.file, temp_file)
+# @app.post("/analyze-audio")
+# async def analyze_audio(file: UploadFile = File(...), user: str = Depends(authenticate)):
+#     # Create a temporary file
+#     safe_filename = file.filename.replace(" ", "_")   # replace spaces
+#     temp_path = os.path.join(tempfile.gettempdir(), safe_filename)
+#     with open(temp_path, "wb") as temp_file:
+#         shutil.copyfileobj(file.file, temp_file)
 
-    # try:
-    #     # Call your function
-    #     results = process_audio(temp_path)
-    #     return results
-    # finally:
-    #     # Cleanup temp file
-    #     if os.path.exists(temp_path):
-    #         os.remove(temp_path)
-    try:
-        # Call your function
-        results = process_audio(temp_path)
-        return results
-    except Exception as e:
-        import traceback
-        error_message = str(e)
-        error_trace = traceback.format_exc()
+#     # try:
+#     #     # Call your function
+#     #     results = process_audio(temp_path)
+#     #     return results
+#     # finally:
+#     #     # Cleanup temp file
+#     #     if os.path.exists(temp_path):
+#     #         os.remove(temp_path)
+#     try:
+#         # Call your function
+#         results = process_audio(temp_path)
+#         return results
+#     except Exception as e:
+#         import traceback
+#         error_message = str(e)
+#         error_trace = traceback.format_exc()
 
-        # Print to logs (so you can see in console/Azure logs)
-        print("Error occurred while processing audio:")
-        print(error_trace)
+#         # Print to logs (so you can see in console/Azure logs)
+#         print("Error occurred while processing audio:")
+#         print(error_trace)
 
-        # Return structured error response
-        return {
-            "status": "error",
-            "message": error_message,
-            "trace": error_trace
-        }
-    finally:
-        # Cleanup temp file
-        if os.path.exists(temp_path):
-            os.remove(temp_path)
+#         # Return structured error response
+#         return {
+#             "status": "error",
+#             "message": error_message,
+#             "trace": error_trace
+#         }
+#     finally:
+#         # Cleanup temp file
+#         if os.path.exists(temp_path):
+#             os.remove(temp_path)
 
 if __name__ == "__main__":
     import uvicorn

@@ -6,6 +6,10 @@ import uuid
 
 import azure.cognitiveservices.speech as speechsdk
 from pydub import AudioSegment
+
+import io
+from azure.storage.blob import BlobServiceClient
+
 from dotenv import load_dotenv, find_dotenv
 load_dotenv(find_dotenv())
 
@@ -175,14 +179,6 @@ def convert_audio_to_pcm_tempfile(input_path):
 #         print(f"Fatal error in recognize_from_file: {e}")
 #         return [], {}
 
-import os
-import io
-import time
-from collections import defaultdict
-from pydub import AudioSegment
-from azure.storage.blob import BlobServiceClient
-import azure.cognitiveservices.speech as speechsdk
-
 
 def recognize_from_file(file_path, container_name="bc-test-samples-segregated", folder_name="savedbycode"):
     try:
@@ -297,7 +293,7 @@ def recognize_from_file(file_path, container_name="bc-test-samples-segregated", 
             except Exception as e:
                 print(f"Error deleting temp file {wav_path}: {e}")
 
-        return (transcriptions, uploaded_files, original_file)
+        return transcriptions, uploaded_files, original_file
 
     except Exception as e:
         print(f"Fatal error in recognize_from_file: {e}")
