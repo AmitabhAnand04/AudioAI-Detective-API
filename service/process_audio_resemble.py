@@ -1,0 +1,54 @@
+import psycopg2
+import json
+
+from service.db_service import connect_to_db
+from service.resemble_detection_service import analyze_audio
+from service.speech_service import recognize_from_file
+
+def process_audio(file_path):
+    # Step 1: Get transcriptions and uploaded files
+    transcriptions, uploaded_files = recognize_from_file(file_path)
+
+    results = []
+
+    # Step 2: Process each speaker
+    for speaker, url in uploaded_files.items():
+        # Call second function to get uuid
+        file_uuid = analyze_audio(url)
+
+        # Collect all transcription segments for this speaker
+        speaker_transcripts = [
+            {"text": text, "start": start, "end": end}
+            for spk, text, start, end in transcriptions if spk == speaker
+        ]
+
+        # Step 3: Store in PostgreSQL
+        cur, conn = connect_to_db()
+        # cur = conn.cursor()
+
+        insert_query = """
+            INSERT INTO audio_data (speaker_name, file_url, file_uuid, transcriptions)
+            VALUES (%s, %s, %s, %s)
+            RETURNING id;
+        """
+        cur.execute(insert_query, (
+            speaker,
+            url,
+            file_uuid,
+            json.dumps(speaker_transcripts)  # Store transcripts as JSON
+        ))
+
+        inserted_id = cur.fetchone()[0]
+        conn.commit()
+        cur.close()
+        conn.close()
+
+        results.append({
+            "id": inserted_id,
+            "speaker": speaker,
+            "url": url,
+            "uuid": file_uuid,
+            "transcriptions": speaker_transcripts
+        })
+
+    return results

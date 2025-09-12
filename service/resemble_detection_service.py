@@ -1,0 +1,74 @@
+import os
+import requests
+from dotenv import load_dotenv, find_dotenv
+load_dotenv(find_dotenv())
+
+def analyze_audio(file_url: str) -> str:
+    """
+    Calls the Resemble AI detect API with the given file URL
+    and returns the UUID from the response if successful.
+    """
+    api_url = "https://app.resemble.ai/api/v2/detect"
+    token = os.getenv("RESEMBLE_API_TOKEN")  # Get token from env
+    
+    if not token:
+        raise RuntimeError("Missing RESEMBLE_API_TOKEN environment variable.")
+
+    headers = {
+        "Authorization": f"Bearer {token}"
+    }
+    params = {"url": file_url}
+
+    try:
+        response = requests.post(api_url, headers=headers, params=params, data={})
+        response.raise_for_status()
+        data = response.json()
+
+        if data.get("success") and "item" in data and "uuid" in data["item"]:
+            print("-------------> New UUID from Resemble AI <-----------------"+data["item"]["uuid"])
+            return data["item"]["uuid"]
+        else:
+            raise ValueError(f"API call failed or UUID missing. Response: {data}")
+
+    except Exception as e:
+        raise RuntimeError(f"Error analyzing audio: {e}")
+
+# def analyze_result(uuid: str) -> dict:
+#     """
+#     Calls the Resemble AI detect API with the given UUID
+#     and returns the 'metrics' field from the response if successful.
+#     """
+#     api_url = f"https://app.resemble.ai/api/v2/detect/{uuid}"
+#     token = os.getenv("RESEMBLE_API_TOKEN")  # Get token from env
+    
+#     if not token:
+#         raise RuntimeError("Missing RESEMBLE_API_TOKEN environment variable.")
+
+#     headers = {
+#         "Authorization": f"Bearer {token}"
+#     }
+
+#     try:
+#         response = requests.get(api_url, headers=headers)
+#         response.raise_for_status()
+#         data = response.json()
+
+#         if data.get("success") and "item" in data and "metrics" in data["item"]:
+#             return data["item"]["metrics"]
+#         else:
+#             raise ValueError(f"API call failed or metrics missing. Response: {data}")
+
+#     except Exception as e:
+#         raise RuntimeError(f"Error analyzing result: {e}")
+
+
+# if __name__ == "__main__":
+# #     # test_url = "https://savoicedetector.blob.core.windows.net/bc-test-samples-segregated/savedbycode/Human_to_AI_Call_8.mp3"
+    
+# #     # # Step 1: Analyze audio and get UUID
+# #     # uuid = analyze_audio(test_url)
+# #     # print("Extracted UUID:", uuid)
+
+#     # Step 2: Use UUID to fetch results
+#     metrics = analyze_result("bbeed9db3e1b9b82df7fb9ec715c7a15")
+#     print("Extracted Metrics:", metrics)
