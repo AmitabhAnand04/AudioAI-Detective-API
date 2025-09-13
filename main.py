@@ -14,6 +14,19 @@ from service.db_service import connect_to_db
 from service.process_audio_resemble import process_audio
 from service.process_result_resemble import update_audio_data
 from dotenv import load_dotenv, find_dotenv
+import logging
+import sys
+
+# Configure logging once in your app startup
+logging.basicConfig(
+    level=logging.INFO,  # you can use DEBUG, WARNING, ERROR too
+    format="%(asctime)s [%(levelname)s] %(message)s",
+    handlers=[
+        logging.StreamHandler(sys.stdout)  # works for local + Azure
+    ]
+)
+
+logger = logging.getLogger(__name__)
 load_dotenv(find_dotenv())
 
 USERNAME = os.getenv("Auth_USERNAME", "admin")
@@ -51,11 +64,11 @@ def background_task(file_path: str):
     try:
         results = process_audio(file_path)
         # Here you can save results to DB instead of just printing
-        print(f"✅ Finished processing {file_path}")
+        logger.info(f"✅ Finished processing {file_path}")
     finally:
         if os.path.exists(file_path):
             os.remove(file_path)
-            print(f"🗑️ Deleted temp file {file_path}")
+            logger.info(f"🗑️ Deleted temp file {file_path}")
 
 
 @app.post("/analyze-audio")
@@ -98,8 +111,8 @@ async def resemble_callback(request: Request, background_tasks: BackgroundTasks)
         file_uuid = item.get("uuid")
         metrics = item.get("metrics", {})
 
-        print(f"Received callback for UUID: {file_uuid}")
-        print(f"Metrics: {metrics}")
+        logger.info(f"Received callback for UUID: {file_uuid}")
+        logger.info(f"Metrics: {metrics}")
 
         # Run DB update in the background
         if file_uuid and metrics:
@@ -204,7 +217,7 @@ async def get_files(
         if conditions:
             query += " AND " + " AND ".join(conditions)
 
-        print(query)
+        logger.info(query)
         cur.execute(query, tuple(params))
         rows = cur.fetchall()
         cur.close()
@@ -313,8 +326,8 @@ async def health_check():
 #         file_uuid = item.get("uuid")
 #         metrics = item.get("metrics", {})
 
-#         print(f"Received callback for UUID: {file_uuid}")
-#         print(f"Metrics: {metrics}")
+#         logger.info(f"Received callback for UUID: {file_uuid}")
+#         logger.info(f"Metrics: {metrics}")
 
 #         # TODO: do further processing (DB update, aggregation, etc.)
 #         update_audio_data(file_uuid, metrics)
@@ -353,8 +366,8 @@ async def health_check():
 #         error_trace = traceback.format_exc()
 
 #         # Print to logs (so you can see in console/Azure logs)
-#         print("Error occurred while processing audio:")
-#         print(error_trace)
+#         logger.info("Error occurred while processing audio:")
+#         logger.info(error_trace)
 
 #         # Return structured error response
 #         return {

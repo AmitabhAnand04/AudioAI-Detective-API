@@ -6,6 +6,20 @@ import json
 from service.db_service import connect_to_db
 from service.resemble_detection_service import analyze_audio, analyze_result
 from service.speech_service import recognize_from_file
+import traceback
+import logging
+import sys
+
+# Configure logging once in your app startup
+logging.basicConfig(
+    level=logging.INFO,  # you can use DEBUG, WARNING, ERROR too
+    format="%(asctime)s [%(levelname)s] %(message)s",
+    handlers=[
+        logging.StreamHandler(sys.stdout)  # works for local + Azure
+    ]
+)
+
+logger = logging.getLogger(__name__)
 
 # def process_audio(file_path):
 #     file_name = os.path.basename(file_path)   # original filename
@@ -66,7 +80,7 @@ from service.speech_service import recognize_from_file
 # import os
 # import uuid
 # import json
-import traceback
+
 
 def process_audio(file_path):
     results = []
@@ -138,21 +152,21 @@ def process_audio(file_path):
 
                 except Exception as db_err:
                     conn.rollback()
-                    print("Database error:", db_err)
-                    print(traceback.format_exc())
+                    logger.error("Database error:", db_err)
+                    logger.error(traceback.format_exc())
                     raise
                 finally:
                     cur.close()
                     conn.close()
 
             except Exception as speaker_err:
-                print(f"Error processing speaker {speaker}: {speaker_err}")
-                print(traceback.format_exc())
+                logger.error(f"Error processing speaker {speaker}: {speaker_err}")
+                logger.error(traceback.format_exc())
                 continue  # move on to next speaker
 
     except Exception as main_err:
-        print("Fatal error in process_audio:", main_err)
-        print(traceback.format_exc())
+        logger.error("Fatal error in process_audio:", main_err)
+        logger.error(traceback.format_exc())
         raise  # re-raise so caller sees the actual error
 
     return results

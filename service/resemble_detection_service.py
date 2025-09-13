@@ -4,6 +4,20 @@ import requests
 from dotenv import load_dotenv, find_dotenv
 load_dotenv(find_dotenv())
 
+import logging
+import sys
+
+# Configure logging once in your app startup
+logging.basicConfig(
+    level=logging.INFO,  # you can use DEBUG, WARNING, ERROR too
+    format="%(asctime)s [%(levelname)s] %(message)s",
+    handlers=[
+        logging.StreamHandler(sys.stdout)  # works for local + Azure
+    ]
+)
+
+logger = logging.getLogger(__name__)
+
 def analyze_audio(file_url: str) -> str:
     """
     Calls the Resemble AI detect API with the given file URL
@@ -31,7 +45,7 @@ def analyze_audio(file_url: str) -> str:
         data = response.json()
 
         if data.get("success") and "item" in data and "uuid" in data["item"]:
-            print("-------------> New UUID from Resemble AI <-----------------"+data["item"]["uuid"])
+            logger.info("-------------> New UUID from Resemble AI <-----------------"+data["item"]["uuid"])
             return data["item"]["uuid"]
         else:
             raise ValueError(f"API call failed or UUID missing. Response: {data}")
@@ -115,8 +129,8 @@ def analyze_result(uuid: str) -> dict:
     
 # #     # # Step 1: Analyze audio and get UUID
 # #     # uuid = analyze_audio(test_url)
-# #     # print("Extracted UUID:", uuid)
+# #     # logger.info("Extracted UUID:", uuid)
 
 #     # Step 2: Use UUID to fetch results
 #     metrics = analyze_result("bbeed9db3e1b9b82df7fb9ec715c7a15")
-#     print("Extracted Metrics:", metrics)
+#     logger.info("Extracted Metrics:", metrics)
