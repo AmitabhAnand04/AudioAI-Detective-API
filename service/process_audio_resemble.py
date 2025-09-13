@@ -1,5 +1,6 @@
 import os
 import uuid
+from dotenv import load_dotenv, find_dotenv
 import psycopg2
 import json
 
@@ -10,16 +11,24 @@ import traceback
 import logging
 import sys
 
-# Configure logging once in your app startup
-logging.basicConfig(
-    level=logging.INFO,  # you can use DEBUG, WARNING, ERROR too
-    format="%(asctime)s [%(levelname)s] %(message)s",
-    handlers=[
-        logging.StreamHandler(sys.stdout)  # works for local + Azure
-    ]
-)
+from opencensus.ext.azure.log_exporter import AzureLogHandler
+load_dotenv(find_dotenv())
 
+# Create logger
 logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
+
+# Always log to console (local + Azure Log Stream)
+console_handler = logging.StreamHandler(sys.stdout)
+console_handler.setFormatter(logging.Formatter("%(asctime)s [%(levelname)s] %(message)s"))
+logger.addHandler(console_handler)
+
+# Add Azure Application Insights handler only if connection string is present
+app_insights_conn = os.getenv("APP_INSIGHTS_CONNECTION_STRING")
+if app_insights_conn:
+    azure_handler = AzureLogHandler(connection_string=app_insights_conn)
+    azure_handler.setFormatter(logging.Formatter("%(asctime)s [%(levelname)s] %(message)s"))
+    logger.addHandler(azure_handler)
 
 # def process_audio(file_path):
 #     file_name = os.path.basename(file_path)   # original filename
