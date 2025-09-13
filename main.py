@@ -1,3 +1,4 @@
+from datetime import datetime
 import json
 import os
 import shutil
@@ -162,22 +163,55 @@ async def get_results(file_name: str = Query(..., description="File name to fetc
     return response
 
 @app.get("/get_files")
-async def get_files(user: str = Depends(authenticate)):
+async def get_files(
+    user: str = Depends(authenticate),
+    start_time: str = Query(None, description="Start timestamp in ISO format"),
+    end_time: str = Query(None, description="End timestamp in ISO format"),
+    file_name: str = Query(None, description="Wildcard search on file name"),
+    format: str = Query(None, description="Filter by file extension (.mp3, .wav, .m4a)")
+):
     try:
         cur, conn = connect_to_db()
-        cur.execute("""SELECT DISTINCT ON (file_id)
-                        file_id,
-                        file_name,
-                        created_at
-                    FROM audio_data
-                    WHERE analysis_label IS NOT NULL
-                    AND file_id IS NOT NULL""")
+
+        # Base query
+        query = """
+            SELECT DISTINCT ON (file_id)
+                file_id,
+                file_name,
+                created_at
+            FROM audio_data
+            WHERE analysis_label IS NOT NULL
+              AND file_id IS NOT NULL
+        """
+        conditions = []
+        params = []
+
+        # Add filters dynamically
+        if start_time:
+            conditions.append("created_at >= %s")
+            params.append(datetime.fromisoformat(start_time))
+        if end_time:
+            conditions.append("created_at <= %s")
+            params.append(datetime.fromisoformat(end_time))
+        if file_name:
+            conditions.append("file_name ILIKE %s")
+            params.append(f"%{file_name}%")
+        if format:
+            conditions.append("file_name ILIKE %s")
+            params.append(f"%.{format.strip('.')}")
+
+        # If there are conditions, add them
+        if conditions:
+            query += " AND " + " AND ".join(conditions)
+
+        print(query)
+        cur.execute(query, tuple(params))
         rows = cur.fetchall()
         cur.close()
         conn.close()
 
         if not rows:
-            return JSONResponse({"error": "No files found"}, status_code=404)
+            return JSONResponse({"files": "No files found"}, status_code=200)
 
         # Map rows to structured response
         files = [
@@ -193,6 +227,39 @@ async def get_files(user: str = Depends(authenticate)):
 
     except Exception as e:
         return JSONResponse({"error": str(e)}, status_code=500)
+
+# @app.get("/get_files")
+# async def get_files(user: str = Depends(authenticate)):
+#     try:
+#         cur, conn = connect_to_db()
+#         cur.execute("""SELECT DISTINCT ON (file_id)
+#                         file_id,
+#                         file_name,
+#                         created_at
+#                     FROM audio_data
+#                     WHERE analysis_label IS NOT NULL
+#                     AND file_id IS NOT NULL""")
+#         rows = cur.fetchall()
+#         cur.close()
+#         conn.close()
+
+#         if not rows:
+#             return JSONResponse({"error": "No files found"}, status_code=404)
+
+#         # Map rows to structured response
+#         files = [
+#             {
+#                 "file_id": str(row[0]),
+#                 "file_name": row[1],
+#                 "created_at": row[2].isoformat() if row[2] else None
+#             }
+#             for row in rows
+#         ]
+
+#         return {"files": files}
+
+#     except Exception as e:
+#         return JSONResponse({"error": str(e)}, status_code=500)
 
 @app.get("/")
 async def health_check():
