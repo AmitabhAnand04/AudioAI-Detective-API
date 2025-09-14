@@ -389,11 +389,19 @@ def run_transcription_with_retry(conversation_transcriber, original_audio, speak
 
     def stop_cb(evt):
         nonlocal transcribing_stop
+        logger.info(f"Transcription session stopped. Reason: {evt}")
+
+        transcribing_stop = True
+
+    def canceled_cb(evt):
+        nonlocal transcribing_stop        
+        logger.error(f"Transcription canceled: {evt.reason}, error={evt.error_details}")
         transcribing_stop = True
 
     conversation_transcriber.transcribed.connect(conversation_transcriber_transcribed_cb)
     conversation_transcriber.session_stopped.connect(stop_cb)
-    conversation_transcriber.canceled.connect(stop_cb)
+    # conversation_transcriber.canceled.connect(stop_cb)
+    conversation_transcriber.canceled.connect(canceled_cb)
 
     def _transcribe():
         nonlocal transcribing_stop
