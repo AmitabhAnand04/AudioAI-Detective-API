@@ -156,7 +156,11 @@ def process_audio(file_path):
                         "file_name": file_name,
                         "file_id": file_id,
                         "file_url": original_file,
-                        "transcriptions": speaker_transcripts
+                        "transcriptions": speaker_transcripts,
+                        "analysis_label": analysis_label,
+                        "analysis_scores": analysis_scores,
+                        "consistency": consistency,
+                        "aggregated_score": aggregated_score
                     })
 
                 except Exception as db_err:

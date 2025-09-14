@@ -350,45 +350,45 @@ async def health_check():
 #             detail=f"Failed to process callback: {e}"
 #         )
 
-# @app.post("/analyze-audio")
-# async def analyze_audio(file: UploadFile = File(...), user: str = Depends(authenticate)):
-#     # Create a temporary file
-#     safe_filename = file.filename.replace(" ", "_")   # replace spaces
-#     temp_path = os.path.join(tempfile.gettempdir(), safe_filename)
-#     with open(temp_path, "wb") as temp_file:
-#         shutil.copyfileobj(file.file, temp_file)
+@app.post("/analyze-audio2")
+async def analyze_audio(file: UploadFile = File(...), user: str = Depends(authenticate)):
+    # Create a temporary file
+    safe_filename = file.filename.replace(" ", "_")   # replace spaces
+    temp_path = os.path.join(tempfile.gettempdir(), safe_filename)
+    with open(temp_path, "wb") as temp_file:
+        shutil.copyfileobj(file.file, temp_file)
 
-#     # try:
-#     #     # Call your function
-#     #     results = process_audio(temp_path)
-#     #     return results
-#     # finally:
-#     #     # Cleanup temp file
-#     #     if os.path.exists(temp_path):
-#     #         os.remove(temp_path)
-#     try:
-#         # Call your function
-#         results = process_audio(temp_path)
-#         return results
-#     except Exception as e:
-#         import traceback
-#         error_message = str(e)
-#         error_trace = traceback.format_exc()
+    # try:
+    #     # Call your function
+    #     results = process_audio(temp_path)
+    #     return results
+    # finally:
+    #     # Cleanup temp file
+    #     if os.path.exists(temp_path):
+    #         os.remove(temp_path)
+    try:
+        # Call your function
+        results = process_audio(temp_path)
+        return results
+    except Exception as e:
+        import traceback
+        error_message = str(e)
+        error_trace = traceback.format_exc()
 
-#         # Print to logs (so you can see in console/Azure logs)
-#         logger.info("Error occurred while processing audio:")
-#         logger.info(error_trace)
+        # Print to logs (so you can see in console/Azure logs)
+        logger.info("Error occurred while processing audio:")
+        logger.info(error_trace)
 
-#         # Return structured error response
-#         return {
-#             "status": "error",
-#             "message": error_message,
-#             "trace": error_trace
-#         }
-#     finally:
-#         # Cleanup temp file
-#         if os.path.exists(temp_path):
-#             os.remove(temp_path)
+        # Return structured error response
+        return {
+            "status": "error",
+            "message": error_message,
+            "trace": error_trace
+        }
+    finally:
+        # Cleanup temp file
+        if os.path.exists(temp_path):
+            os.remove(temp_path)
 
 if __name__ == "__main__":
     import uvicorn
