@@ -161,21 +161,21 @@ def process_audio(file_path):
 
                 except Exception as db_err:
                     conn.rollback()
-                    logger.error("Database error:", db_err)
-                    logger.error(traceback.format_exc())
+                    logger.info("Database error:", db_err)
+                    logger.info(traceback.format_exc())
                     raise
                 finally:
                     cur.close()
                     conn.close()
 
             except Exception as speaker_err:
-                logger.error(f"Error processing speaker {speaker}: {speaker_err}")
-                logger.error(traceback.format_exc())
+                logger.info(f"Error processing speaker {speaker}: {speaker_err}")
+                logger.info(traceback.format_exc())
                 continue  # move on to next speaker
 
     except Exception as main_err:
-        logger.error("Fatal error in process_audio:", main_err)
-        logger.error(traceback.format_exc())
+        logger.info("Fatal error in process_audio:", main_err)
+        logger.info(traceback.format_exc())
         raise  # re-raise so caller sees the actual error
 
     return results

@@ -27,14 +27,14 @@ def connect_to_db():
         # Connect to your postgres DB
         connection = psycopg2.connect(user=os.getenv("DB_USER"), password=os.getenv("DB_PASSWORD"), host=os.getenv("DB_HOST"), port=os.getenv("DB_PORT"), database=os.getenv("DB_NAME"))
         
-        logger.info(connection)
+        # logger.info(connection)
         
         cursor = connection.cursor()
         cursor.execute("SELECT version();")
         db_version = cursor.fetchone()
-        logger.info(f"Connected to database: {db_version[0]}")
+        # logger.info(f"Connected to database: {db_version[0]}")
         return cursor, connection
     except Exception as e:
-        logger.error(f"Error connecting to database: {e}")
+        logger.info(f"Error connecting to database: {e}")
         return None
  

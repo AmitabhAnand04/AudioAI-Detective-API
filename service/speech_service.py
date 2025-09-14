@@ -55,7 +55,7 @@ def convert_audio_to_pcm_tempfile(input_path):
     if not os.path.exists(input_path):
         raise FileNotFoundError(f"File not found: {input_path}")
     
-    logger.info("Conversion Process Started!!")
+    logger.info("Conversion Process Started!! for file: " + input_path)
 
     # Detect extension and load accordingly
     ext = os.path.splitext(input_path)[1].lower()
@@ -75,6 +75,7 @@ def convert_audio_to_pcm_tempfile(input_path):
     temp_wav_file.close()
 
     audio.export(temp_wav_path, format="wav")
+    logger.info(f"Conversion completed. Temporary WAV file created at: {temp_wav_path}")
     return temp_wav_path
 
 # def recognize_from_file(file_path, output_dir="clips"):
@@ -325,6 +326,7 @@ def retry_operation(func, retries=5, *args, **kwargs):
     last_exception = None
     for attempt in range(1, retries + 1):
         try:
+            logger.info(f"[Retry {attempt}/{retries}] Attempting {func.__name__}...")
             return func(*args, **kwargs)
         except Exception as e:
             logger.info(f"[Retry {attempt}/{retries}] {func.__name__} failed: {e}")
@@ -345,7 +347,7 @@ def retry_operation(func, retries=5, *args, **kwargs):
 def upload_blob_with_retry(container_client, blob_name, data, overwrite=True):
     def _upload():
         blob_client = container_client.get_blob_client(blob_name)
-
+        logger.info(f"Uploading blob: {blob_name}")
         # Detect MIME type from filename extension (fallback to audio/mpeg)
         content_type, _ = mimetypes.guess_type(blob_name)
         if not content_type:
@@ -359,6 +361,7 @@ def upload_blob_with_retry(container_client, blob_name, data, overwrite=True):
                 cache_control="public, max-age=3600"  # allow browsers/CDNs to cache for 1 hour
             )
         )
+        logger.info(f"Upload completed: {blob_name}")
         return blob_client.url
 
     return retry_operation(_upload, retries=5)
@@ -368,6 +371,7 @@ def run_transcription_with_retry(conversation_transcriber, original_audio, speak
     transcribing_stop = False
 
     def conversation_transcriber_transcribed_cb(evt):
+        logger.info("Transcription event received.")
         try:
             if evt.result.reason == speechsdk.ResultReason.RecognizedSpeech:
                 speaker = evt.result.speaker_id or "Unknown"
@@ -381,6 +385,7 @@ def run_transcription_with_retry(conversation_transcriber, original_audio, speak
                 logger.info(f"Buffered clip for {speaker}: '{text}' ({start_time}-{end_time})")
         except Exception as e:
             logger.info(f"Error in transcription callback: {e}")
+            raise
 
     def stop_cb(evt):
         nonlocal transcribing_stop
@@ -393,10 +398,15 @@ def run_transcription_with_retry(conversation_transcriber, original_audio, speak
     def _transcribe():
         nonlocal transcribing_stop
         transcribing_stop = False
+
         conversation_transcriber.start_transcribing_async()
         while not transcribing_stop:
             time.sleep(0.5)
         conversation_transcriber.stop_transcribing_async()
+
+        if not transcriptions:  # nothing captured
+            raise RuntimeError("No transcription results, retrying...")
+
         return True
 
     return retry_operation(_transcribe, retries=5)
@@ -447,6 +457,7 @@ def recognize_from_file(file_path, container_name="bc-test-samples-segregated", 
         try:
             original_audio = AudioSegment.from_file(file_path)
         except Exception as e:
+            logger.info(f"Error loading audio file: {e}")
             raise RuntimeError(f"Failed to load audio file: {file_path}, error: {e}")
 
         speaker_clips = defaultdict(list)
@@ -454,7 +465,9 @@ def recognize_from_file(file_path, container_name="bc-test-samples-segregated", 
         uploaded_files = {}
 
         # ✅ Run transcription with retry
+        logger.info(f"Starting transcription with retry for file {original_file}...")
         run_transcription_with_retry(conversation_transcriber, original_audio, speaker_clips, transcriptions)
+        logger.info(f"Transcription completed for file {original_file}.")
 
         # ✅ Upload speaker clips with retry
         for speaker, clips in speaker_clips.items():
@@ -462,6 +475,7 @@ def recognize_from_file(file_path, container_name="bc-test-samples-segregated", 
                 logger.info("Skipping export for speaker: Unknown")
                 continue
             if clips:
+                logger.info(f"combining {len(clips)} clips for speaker: {speaker} for file {original_file}")
                 combined = sum(clips)
                 buffer = io.BytesIO()
                 combined.export(buffer, format="mp3")
@@ -470,7 +484,7 @@ def recognize_from_file(file_path, container_name="bc-test-samples-segregated", 
                 blob_name = f"{folder_name}/{str(uuid.uuid4())}{speaker}.mp3"
                 blob_url = upload_blob_with_retry(container_client, blob_name, buffer)
                 uploaded_files[speaker] = blob_url
-                logger.info(f"Uploaded clip for {speaker}: {blob_url}")
+                logger.info(f"Uploaded clip for {original_file}-{speaker}: {blob_url}")
 
         # Cleanup
         audio_config = None
