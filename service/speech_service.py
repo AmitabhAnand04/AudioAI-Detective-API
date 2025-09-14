@@ -389,7 +389,7 @@ def run_transcription_with_retry(conversation_transcriber, original_audio, speak
 
     def stop_cb(evt):
         nonlocal transcribing_stop
-        logger.info(f"Transcription session stopped. Reason: {evt}")
+        logger.info(f"Transcription session stopped. Reason: {evt}, reason: {evt.reason}, error={evt.error_details}")
 
         transcribing_stop = True
 
