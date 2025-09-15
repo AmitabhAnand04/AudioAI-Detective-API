@@ -148,20 +148,40 @@ def process_audio(file_path):
                     inserted_id = cur.fetchone()[0]
                     conn.commit()
 
-                    results.append({
-                        "id": inserted_id,
-                        "speaker": speaker,
-                        "url": url,
-                        "uuid": file_uuid,
+                    # results.append({
+                    #     "id": inserted_id,
+                    #     "speaker": speaker,
+                    #     "url": url,
+                    #     "uuid": file_uuid,
+                    #     "file_name": file_name,
+                    #     "file_id": file_id,
+                    #     "file_url": original_file,
+                    #     "transcriptions": speaker_transcripts,
+                    #     "analysis_label": analysis_label,
+                    #     "analysis_scores": analysis_scores,
+                    #     "consistency": consistency,
+                    #     "aggregated_score": aggregated_score
+                    # })
+                    response = {
                         "file_name": file_name,
                         "file_id": file_id,
-                        "file_url": original_file,
-                        "transcriptions": speaker_transcripts,
-                        "analysis_label": analysis_label,
-                        "analysis_scores": analysis_scores,
-                        "consistency": consistency,
-                        "aggregated_score": aggregated_score
-                    })
+                        "file_url": original_file,   # keep consistent with get-results
+                        "segments": []
+                    }
+
+                    for t in speaker_transcripts:  # because it's already a list
+                        response["segments"].append({
+                            "start": t["start"],
+                            "end": t["end"],
+                            "text": t["text"],
+                            "metrics": {
+                                "label": analysis_label,
+                                "score": analysis_scores,
+                                "consistency": consistency,
+                                "aggregated_score": aggregated_score
+                            }
+                        })
+                    results.append(response)
 
                 except Exception as db_err:
                     conn.rollback()
