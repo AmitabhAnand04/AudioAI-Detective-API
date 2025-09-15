@@ -432,6 +432,10 @@ def recognize_from_file(file_path, container_name="bc-test-samples-segregated", 
         )
         container_client = blob_service_client.get_container_client(container_name)
 
+        chunk_minutes = int(os.getenv("AUDIO_CHUNK_MINUTES", "0"))
+        logger.info(f"Audio chunk minutes set to: {chunk_minutes}")
+        chunk_ms = chunk_minutes * 60 * 1000  # Convert to ms (pydub works in ms)
+
         # ✅ Upload original file with retry
         with open(file_path, "rb") as data:
             original_blob_name = f"{folder_name}/{os.path.basename(file_path)}"
@@ -488,6 +492,9 @@ def recognize_from_file(file_path, container_name="bc-test-samples-segregated", 
             if clips:
                 logger.info(f"combining {len(clips)} clips for speaker: {speaker} for file {original_file}")
                 combined = sum(clips)
+                # If chunk_ms > 0, trim audio, otherwise keep full
+                if chunk_ms > 0:
+                    combined = combined[:chunk_ms]
                 buffer = io.BytesIO()
                 combined.export(buffer, format="mp3")
                 buffer.seek(0)
