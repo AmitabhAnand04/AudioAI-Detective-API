@@ -469,7 +469,7 @@ def recognize_from_file(file_path, container_name="bc-test-samples-segregated", 
             original_audio = AudioSegment.from_file(file_path)
         except Exception as e:
             logger.info(f"Error loading audio file: {e}")
-            raise RuntimeError(f"Failed to load audio file: {file_path}, error: {e}")
+            raise RuntimeError(f"Failed to load audio file: error: {e}")
 
         speaker_clips = defaultdict(list)
         transcriptions = []

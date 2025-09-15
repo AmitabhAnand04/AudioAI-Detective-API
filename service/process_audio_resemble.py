@@ -91,15 +91,131 @@ if app_insights_conn:
 # import json
 
 
+# def process_audio(file_path):
+#     response = {}
+#     file_name = os.path.basename(file_path)   # original filename
+#     file_id = str(uuid.uuid4())
+
+#     try:
+#         # Step 1: Get transcriptions and uploaded files
+#         transcriptions, uploaded_files, original_file = recognize_from_file(file_path)
+#         # test_tuple = recognize_from_file(file_path)
+
+#         # Step 2: Process each speaker
+#         for speaker, url in uploaded_files.items():
+#             try:
+#                 # Call second function to get uuid
+#                 file_uuid = analyze_audio(url)
+#                 result = analyze_result(file_uuid)  
+#                 analysis_label = result.get("analysis_label")
+#                 analysis_scores = result.get("analysis_scores")
+#                 consistency = result.get("consistency")
+#                 aggregated_score = result.get("aggregated_score")
+#                 # Collect all transcription segments for this speaker
+#                 speaker_transcripts = [
+#                     {"text": text, "start": start, "end": end}
+#                     for spk, text, start, end in transcriptions if spk == speaker
+#                 ]
+
+#                 # Step 3: Store in PostgreSQL
+#                 cur, conn = connect_to_db()
+#                 try:
+#                     insert_query = """
+#                         INSERT INTO audio_data (
+#                             speaker_name, file_url, file_uuid,
+#                             transcriptions, file_name, file_id, original_file_url,
+#                             analysis_label, analysis_scores, consistency, aggregated_score
+#                         )
+#                         VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+#                         RETURNING id;
+#                     """
+
+#                     cur.execute(insert_query, (
+#                         speaker,
+#                         url,
+#                         file_uuid,
+#                         json.dumps(speaker_transcripts),
+#                         file_name,
+#                         file_id,
+#                         original_file,
+#                         analysis_label,
+#                         json.dumps(analysis_scores),
+#                         consistency,
+#                         aggregated_score
+#                     ))
+
+
+#                     inserted_id = cur.fetchone()[0]
+#                     conn.commit()
+
+#                     # results.append({
+#                     #     "id": inserted_id,
+#                     #     "speaker": speaker,
+#                     #     "url": url,
+#                     #     "uuid": file_uuid,
+#                     #     "file_name": file_name,
+#                     #     "file_id": file_id,
+#                     #     "file_url": original_file,
+#                     #     "transcriptions": speaker_transcripts,
+#                     #     "analysis_label": analysis_label,
+#                     #     "analysis_scores": analysis_scores,
+#                     #     "consistency": consistency,
+#                     #     "aggregated_score": aggregated_score
+#                     # })
+#                     response = {
+#                         "file_name": file_name,
+#                         "file_id": file_id,
+#                         "file_url": original_file,   # keep consistent with get-results
+#                         "segments": []
+#                     }
+
+#                     for t in speaker_transcripts:  # because it's already a list
+#                         response["segments"].append({
+#                             "start": t["start"],
+#                             "end": t["end"],
+#                             "text": t["text"],
+#                             "metrics": {
+#                                 "label": analysis_label,
+#                                 "score": analysis_scores,
+#                                 "consistency": consistency,
+#                                 "aggregated_score": aggregated_score
+#                             }
+#                         })
+
+#                 except Exception as db_err:
+#                     conn.rollback()
+#                     logger.info("Database error:", db_err)
+#                     logger.info(traceback.format_exc())
+#                     raise
+#                 finally:
+#                     cur.close()
+#                     conn.close()
+
+#             except Exception as speaker_err:
+#                 logger.info(f"Error processing speaker {speaker}: {speaker_err}")
+#                 logger.info(traceback.format_exc())
+#                 continue  # move on to next speaker
+
+#     except Exception as main_err:
+#         logger.info("Fatal error in process_audio:", main_err)
+#         logger.info(traceback.format_exc())
+#         raise  # re-raise so caller sees the actual error
+
+#     return response
+#     # return test_tuple
+
 def process_audio(file_path):
-    response = {}
-    file_name = os.path.basename(file_path)   # original filename
-    file_id = str(uuid.uuid4())
+    response = {
+        "file_name": os.path.basename(file_path),
+        "file_id": str(uuid.uuid4()),
+        "file_url": None,   # will be set from original file
+        "segments": []      # <-- flat list of all speaker segments
+    }
 
     try:
         # Step 1: Get transcriptions and uploaded files
         transcriptions, uploaded_files, original_file = recognize_from_file(file_path)
-        # test_tuple = recognize_from_file(file_path)
+        response["file_url"] = original_file  # set once
 
         # Step 2: Process each speaker
         for speaker, url in uploaded_files.items():
@@ -111,6 +227,7 @@ def process_audio(file_path):
                 analysis_scores = result.get("analysis_scores")
                 consistency = result.get("consistency")
                 aggregated_score = result.get("aggregated_score")
+
                 # Collect all transcription segments for this speaker
                 speaker_transcripts = [
                     {"text": text, "start": start, "end": end}
@@ -135,61 +252,37 @@ def process_audio(file_path):
                         url,
                         file_uuid,
                         json.dumps(speaker_transcripts),
-                        file_name,
-                        file_id,
+                        response["file_name"],
+                        response["file_id"],
                         original_file,
                         analysis_label,
                         json.dumps(analysis_scores),
                         consistency,
                         aggregated_score
                     ))
-
-
-                    inserted_id = cur.fetchone()[0]
                     conn.commit()
-
-                    # results.append({
-                    #     "id": inserted_id,
-                    #     "speaker": speaker,
-                    #     "url": url,
-                    #     "uuid": file_uuid,
-                    #     "file_name": file_name,
-                    #     "file_id": file_id,
-                    #     "file_url": original_file,
-                    #     "transcriptions": speaker_transcripts,
-                    #     "analysis_label": analysis_label,
-                    #     "analysis_scores": analysis_scores,
-                    #     "consistency": consistency,
-                    #     "aggregated_score": aggregated_score
-                    # })
-                    response = {
-                        "file_name": file_name,
-                        "file_id": file_id,
-                        "file_url": original_file,   # keep consistent with get-results
-                        "segments": []
-                    }
-
-                    for t in speaker_transcripts:  # because it's already a list
-                        response["segments"].append({
-                            "start": t["start"],
-                            "end": t["end"],
-                            "text": t["text"],
-                            "metrics": {
-                                "label": analysis_label,
-                                "score": analysis_scores,
-                                "consistency": consistency,
-                                "aggregated_score": aggregated_score
-                            }
-                        })
+                    cur.close()
+                    conn.close()
 
                 except Exception as db_err:
                     conn.rollback()
                     logger.info("Database error:", db_err)
                     logger.info(traceback.format_exc())
                     raise
-                finally:
-                    cur.close()
-                    conn.close()
+
+                # Append this speaker’s segments into one flat list
+                for t in speaker_transcripts:
+                    response["segments"].append({
+                        "start": t["start"],
+                        "end": t["end"],
+                        "text": t["text"],
+                        "metrics": {
+                            "label": analysis_label,
+                            "score": analysis_scores,
+                            "consistency": consistency,
+                            "aggregated_score": aggregated_score
+                        }
+                    })
 
             except Exception as speaker_err:
                 logger.info(f"Error processing speaker {speaker}: {speaker_err}")
@@ -199,7 +292,6 @@ def process_audio(file_path):
     except Exception as main_err:
         logger.info("Fatal error in process_audio:", main_err)
         logger.info(traceback.format_exc())
-        raise  # re-raise so caller sees the actual error
+        raise
 
     return response
-    # return test_tuple
