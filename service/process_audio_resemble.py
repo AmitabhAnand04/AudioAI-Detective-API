@@ -266,7 +266,7 @@ def process_audio(file_path):
 
                 except Exception as db_err:
                     conn.rollback()
-                    logger.info("Database error:", db_err)
+                    logger.info(f"Database error: {db_err}")
                     logger.info(traceback.format_exc())
                     raise
 
@@ -290,7 +290,7 @@ def process_audio(file_path):
                 continue  # move on to next speaker
 
     except Exception as main_err:
-        logger.info("Fatal error in process_audio:", main_err)
+        logger.info(f"Fatal error in process_audio: {main_err}")
         logger.info(traceback.format_exc())
         raise
 
