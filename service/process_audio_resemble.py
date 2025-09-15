@@ -92,7 +92,7 @@ if app_insights_conn:
 
 
 def process_audio(file_path):
-    results = []
+    response = {}
     file_name = os.path.basename(file_path)   # original filename
     file_id = str(uuid.uuid4())
 
@@ -181,7 +181,6 @@ def process_audio(file_path):
                                 "aggregated_score": aggregated_score
                             }
                         })
-                    results.append(response)
 
                 except Exception as db_err:
                     conn.rollback()
@@ -202,5 +201,5 @@ def process_audio(file_path):
         logger.info(traceback.format_exc())
         raise  # re-raise so caller sees the actual error
 
-    return results
+    return response
     # return test_tuple
